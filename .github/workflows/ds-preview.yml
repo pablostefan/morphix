@@ -150,8 +150,8 @@ jobs:
             echo '<!-- morphix-pr-compare -->'
             echo '## Morphix Component Compare'
             echo
-            echo "Base branch: \\`${BASE_REF}\\`"
-            echo "Head branch: \\`${HEAD_REF}\\`"
+            echo "Base branch: ${BASE_REF}"
+            echo "Head branch: ${HEAD_REF}"
             echo
             echo 'Componentes alterados nesta PR:'
           } > "$COMMENT_FILE"
