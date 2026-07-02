@@ -45,49 +45,54 @@ jobs:
       - name: Filter relevant paths
         id: filter
         run: |
-          SHOULD_RUN='false'
-          MATCHED_FILES=''
-          MATCHED_PATTERNS=''
-
           if [[ -n "${BASE_SHA}" ]]; then
             CHANGED_FILES="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
           else
             CHANGED_FILES="$(git show --pretty='' --name-only "${HEAD_SHA}")"
           fi
 
-          while IFS= read -r changed_file; do
-            [[ -z "${changed_file}" ]] && continue
+          CHANGED_FILES="$CHANGED_FILES" python3 - <<'PY'
+            from pathlib import PurePosixPath
+            import os
 
-            while IFS= read -r raw_pattern; do
-              pattern="${raw_pattern#${raw_pattern%%[![:space:]]*}}"
-              pattern="${pattern%${pattern##*[![:space:]]}}"
+            changed_files = [
+              line.strip()
+              for line in os.environ.get('CHANGED_FILES', '').splitlines()
+              if line.strip()
+            ]
 
-              [[ -z "${pattern}" ]] && continue
-              [[ "${pattern}" == \#* ]] && continue
+            patterns = []
+            with open('.github/ds-preview-paths.txt', encoding='utf-8') as handle:
+              for raw_line in handle:
+                pattern = raw_line.strip()
+                if not pattern or pattern.startswith('#'):
+                  continue
+                patterns.append(pattern)
 
-              if [[ "${changed_file}" == ${pattern} ]]; then
-                SHOULD_RUN='true'
-                MATCHED_FILES+="${changed_file}"$'\n'
-                MATCHED_PATTERNS+="${pattern}"$'\n'
-                break
-              fi
-            done < .github/ds-preview-paths.txt
-          done <<< "${CHANGED_FILES}"
+            matched_files = set()
+            matched_patterns = set()
 
-          {
-            echo "should_run=${SHOULD_RUN}"
-            echo 'changed_files<<EOF'
-            echo "${CHANGED_FILES}"
-            echo 'EOF'
-            echo 'matched_files<<EOF'
-            printf '%s' "${MATCHED_FILES}" | sort -u
-            echo
-            echo 'EOF'
-            echo 'matched_patterns<<EOF'
-            printf '%s' "${MATCHED_PATTERNS}" | sort -u
-            echo
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
+            for changed_file in changed_files:
+              path = PurePosixPath(changed_file)
+              for pattern in patterns:
+                if path.match(pattern):
+                  matched_files.add(changed_file)
+                  matched_patterns.add(pattern)
+
+            should_run = 'true' if matched_files else 'false'
+
+            with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'should_run={should_run}\n')
+              output.write('changed_files<<EOF\n')
+              output.write('\n'.join(changed_files))
+              output.write('\nEOF\n')
+              output.write('matched_files<<EOF\n')
+              output.write('\n'.join(sorted(matched_files)))
+              output.write('\nEOF\n')
+              output.write('matched_patterns<<EOF\n')
+              output.write('\n'.join(sorted(matched_patterns)))
+              output.write('\nEOF\n')
+            PY
 
       - name: Summary
         run: |
