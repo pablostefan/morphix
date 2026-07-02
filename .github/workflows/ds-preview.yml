@@ -17,7 +17,9 @@ jobs:
         run: |
           BRANCH_NAME="${GITHUB_REF_NAME}"
           BRANCH_SLUG="$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
+          PREVIEW_VERSION="${GITHUB_SHA::12}"
           echo "BRANCH_SLUG=${BRANCH_SLUG}" >> "$GITHUB_ENV"
+          echo "PREVIEW_VERSION=${PREVIEW_VERSION}" >> "$GITHUB_ENV"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -42,7 +44,7 @@ jobs:
       - name: Build web
         run: |
           cd morphix_ds_catalog
-          flutter build web --release --base-href "/morphix/${BRANCH_SLUG}/"
+          flutter build web --release --pwa-strategy=none --base-href "/morphix/${BRANCH_SLUG}/"
 
       - name: Create ds_button redirect page
         run: |
@@ -56,7 +58,7 @@ jobs:
             '  <meta name="viewport" content="width=device-width, initial-scale=1">' \
             '  <title>ds_button</title>' \
             '  <script>' \
-            "    window.location.replace('../?component=ds_button');" \
+            "    window.location.replace('../?component=ds_button&v=${PREVIEW_VERSION}');" \
             '  </script>' \
             '</head>' \
             '<body></body>' \
@@ -72,5 +74,5 @@ jobs:
 
       - name: Output links
         run: |
-          echo "Branch preview: https://pablostefan.github.io/morphix/${BRANCH_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
-          echo "- https://pablostefan.github.io/morphix/${BRANCH_SLUG}/ds_button" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch preview: https://pablostefan.github.io/morphix/${BRANCH_SLUG}/?v=${PREVIEW_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- https://pablostefan.github.io/morphix/${BRANCH_SLUG}/ds_button?v=${PREVIEW_VERSION}" >> "$GITHUB_STEP_SUMMARY"

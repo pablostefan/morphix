@@ -14,6 +14,12 @@ Formato de URL:
 - Branch: `https://<owner>.github.io/morphix/<branch-slug>/`
 - Componente: `https://<owner>.github.io/morphix/<branch-slug>/<component-id>`
 
+Para evitar cache do navegador entre builds da mesma branch, use o parâmetro
+`v` gerado pelo workflow:
+
+- Branch: `https://<owner>.github.io/morphix/<branch-slug>/?v=<sha-curto>`
+- Componente: `https://<owner>.github.io/morphix/<branch-slug>/<component-id>?v=<sha-curto>`
+
 Exemplo atual:
 
 - `main/ds_button`
