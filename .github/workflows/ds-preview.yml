@@ -2,12 +2,16 @@ name: DS Preview
 
 on:
   push:
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   publish:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -46,24 +50,33 @@ jobs:
           cd morphix_ds_catalog
           flutter build web --release --pwa-strategy=none --base-href "/morphix/${BRANCH_SLUG}/"
 
-      - name: Create ds_button redirect page
+      - name: Patch web assets cache-busting
         run: |
           cd morphix_ds_catalog
-          mkdir -p build/web/ds_button
-          printf '%s\n' \
-            '<!doctype html>' \
-            '<html>' \
-            '<head>' \
-            '  <meta charset="utf-8">' \
-            '  <meta name="viewport" content="width=device-width, initial-scale=1">' \
-            '  <title>ds_button</title>' \
-            '  <script>' \
-            "    window.location.replace('../?component=ds_button&v=${PREVIEW_VERSION}');" \
-            '  </script>' \
-            '</head>' \
-            '<body></body>' \
-            '</html>' \
-            > build/web/ds_button/index.html
+          sed -i "s#main.dart.js#main.dart.js?v=${PREVIEW_VERSION}#g" build/web/flutter_bootstrap.js
+          sed -i "s#main.dart.js#main.dart.js?v=${PREVIEW_VERSION}#g" build/web/index.html
+
+      - name: Create component redirect pages
+        run: |
+          cd morphix_ds_catalog
+          while IFS= read -r component_id; do
+            [[ -z "${component_id}" ]] && continue
+            mkdir -p "build/web/${component_id}"
+            printf '%s\n' \
+              '<!doctype html>' \
+              '<html>' \
+              '<head>' \
+              '  <meta charset="utf-8">' \
+              '  <meta name="viewport" content="width=device-width, initial-scale=1">' \
+              "  <title>${component_id}</title>" \
+              '  <script>' \
+              "    window.location.replace('../?component=${component_id}&v=${PREVIEW_VERSION}');" \
+              '  </script>' \
+              '</head>' \
+              '<body></body>' \
+              '</html>' \
+              > "build/web/${component_id}/index.html"
+          done < tool/component_ids.txt
 
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
@@ -75,4 +88,138 @@ jobs:
       - name: Output links
         run: |
           echo "Branch preview: https://pablostefan.github.io/morphix/${BRANCH_SLUG}/?v=${PREVIEW_VERSION}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- https://pablostefan.github.io/morphix/${BRANCH_SLUG}/ds_button?v=${PREVIEW_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r component_id; do
+            [[ -z "${component_id}" ]] && continue
+            echo "- https://pablostefan.github.io/morphix/${BRANCH_SLUG}/${component_id}?v=${PREVIEW_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          done < morphix_ds_catalog/tool/component_ids.txt
+
+  pr-compare-links:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve PR context
+        run: |
+          BASE_REF="${{ github.event.pull_request.base.ref }}"
+          HEAD_REF="${{ github.event.pull_request.head.ref }}"
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          BASE_SLUG="$(echo "${BASE_REF}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
+          HEAD_SLUG="$(echo "${HEAD_REF}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
+
+          echo "BASE_REF=${BASE_REF}" >> "$GITHUB_ENV"
+          echo "HEAD_REF=${HEAD_REF}" >> "$GITHUB_ENV"
+          echo "BASE_SHA=${BASE_SHA}" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=${HEAD_SHA}" >> "$GITHUB_ENV"
+          echo "BASE_SLUG=${BASE_SLUG}" >> "$GITHUB_ENV"
+          echo "HEAD_SLUG=${HEAD_SLUG}" >> "$GITHUB_ENV"
+          echo "BASE_VERSION=${BASE_SHA::12}" >> "$GITHUB_ENV"
+          echo "HEAD_VERSION=${HEAD_SHA::12}" >> "$GITHUB_ENV"
+
+      - name: Detect changed component IDs
+        run: |
+          CHANGED_FILES="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
+
+          declare -A IDS
+          while IFS= read -r file; do
+            [[ -z "${file}" ]] && continue
+
+            if [[ "${file}" =~ ^morphix_ds_catalog/lib/src/components/(.+)_preview\.dart$ ]]; then
+              IDS["${BASH_REMATCH[1]}"]=1
+              continue
+            fi
+
+            if [[ "${file}" =~ ^morphix_design_system/lib/src/widgets/(.+)\.dart$ ]]; then
+              IDS["${BASH_REMATCH[1]}"]=1
+              continue
+            fi
+          done <<< "${CHANGED_FILES}"
+
+          if [[ ${#IDS[@]} -eq 0 ]]; then
+            while IFS= read -r component_id; do
+              [[ -z "${component_id}" ]] && continue
+              IDS["${component_id}"]=1
+            done < morphix_ds_catalog/tool/component_ids.txt
+          fi
+
+          SORTED_IDS="$(printf '%s\n' "${!IDS[@]}" | sort | uniq)"
+
+          {
+            echo "CHANGED_COMPONENT_IDS<<EOF"
+            echo "${SORTED_IDS}"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Build PR comment body
+        run: |
+          COMMENT_FILE=pr-compare-comment.md
+          {
+            echo '<!-- morphix-pr-compare -->'
+            echo '## Morphix Component Compare'
+            echo
+            echo "Base branch: ${BASE_REF}"
+            echo "Head branch: ${HEAD_REF}"
+            echo
+            echo 'Componentes alterados nesta PR:'
+          } > "$COMMENT_FILE"
+
+          while IFS= read -r component_id; do
+            [[ -z "${component_id}" ]] && continue
+            COMPARE_URL="https://pablostefan.github.io/morphix/${HEAD_SLUG}/?compare=1&component=${component_id}&base=${BASE_SLUG}&head=${HEAD_SLUG}&vbase=${BASE_VERSION}&vhead=${HEAD_VERSION}"
+            BASE_URL="https://pablostefan.github.io/morphix/${BASE_SLUG}/${component_id}?v=${BASE_VERSION}"
+            HEAD_URL="https://pablostefan.github.io/morphix/${HEAD_SLUG}/${component_id}?v=${HEAD_VERSION}"
+
+            {
+              echo "- **${component_id}**"
+              echo "  - Compare: ${COMPARE_URL}"
+              echo "  - Base: ${BASE_URL}"
+              echo "  - Head: ${HEAD_URL}"
+            } >> "$COMMENT_FILE"
+          done <<< "${CHANGED_COMPONENT_IDS}"
+
+          {
+            echo
+            echo "PR run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$COMMENT_FILE"
+
+      - name: Create or update PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- morphix-pr-compare -->';
+            const body = fs.readFileSync('pr-compare-comment.md', 'utf8');
+
+            const issue_number = context.payload.pull_request.number;
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
