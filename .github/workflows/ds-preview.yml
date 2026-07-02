@@ -9,9 +9,6 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    env:
-      REPO_NAME: morphix
-      REPO_OWNER: ${{ github.repository_owner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,7 +17,6 @@ jobs:
         run: |
           BRANCH_NAME="${GITHUB_REF_NAME}"
           BRANCH_SLUG="$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
-          echo "BRANCH_NAME=${BRANCH_NAME}" >> "$GITHUB_ENV"
           echo "BRANCH_SLUG=${BRANCH_SLUG}" >> "$GITHUB_ENV"
 
       - name: Setup Flutter
@@ -46,31 +42,26 @@ jobs:
       - name: Build web
         run: |
           cd morphix_ds_catalog
-          flutter build web --release --base-href "/${REPO_NAME}/${BRANCH_SLUG}/"
+          flutter build web --release --base-href "/morphix/${BRANCH_SLUG}/"
 
-      - name: Create component redirect pages
+      - name: Create ds_button redirect page
         run: |
           cd morphix_ds_catalog
-          while IFS= read -r component_id; do
-            if [ -z "${component_id}" ]; then
-              continue
-            fi
-            mkdir -p "build/web/${component_id}"
-            cat > "build/web/${component_id}/index.html" <<EOF
+          mkdir -p build/web/ds_button
+          cat > build/web/ds_button/index.html <<'EOF'
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${component_id}</title>
+  <title>ds_button</title>
   <script>
-    window.location.replace('../?component=${component_id}');
+    window.location.replace('../?component=ds_button');
   </script>
 </head>
 <body></body>
 </html>
 EOF
-          done < tool/component_ids.txt
 
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
@@ -81,10 +72,5 @@ EOF
 
       - name: Output links
         run: |
-          echo "Branch preview: https://${REPO_OWNER}.github.io/${REPO_NAME}/${BRANCH_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
-          while IFS= read -r component_id; do
-            if [ -z "${component_id}" ]; then
-              continue
-            fi
-            echo "- https://${REPO_OWNER}.github.io/${REPO_NAME}/${BRANCH_SLUG}/${component_id}" >> "$GITHUB_STEP_SUMMARY"
-          done < morphix_ds_catalog/tool/component_ids.txt
+          echo "Branch preview: https://pablostefan.github.io/morphix/${BRANCH_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          echo "- https://pablostefan.github.io/morphix/${BRANCH_SLUG}/ds_button" >> "$GITHUB_STEP_SUMMARY"
