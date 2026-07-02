@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'src/compare_frame.dart';
 import 'src/component_registry.dart';
@@ -217,6 +218,8 @@ class _CatalogCompareView extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             children: [
               _CompareHeader(config: config),
+              const SizedBox(height: 12),
+              const _CompareTips(),
               const SizedBox(height: 16),
               if (isNarrow) ...[
                 _ComparePanel(
@@ -314,6 +317,88 @@ class _CompareHeader extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _MetaChip(
+                  label: 'Componente',
+                  value: config.componentId,
+                  color: Colors.blueGrey,
+                ),
+                _MetaChip(
+                  label: 'Base',
+                  value: config.baseBranch,
+                  color: Colors.teal,
+                ),
+                _MetaChip(
+                  label: 'Head',
+                  value: config.headBranch,
+                  color: Colors.deepOrange,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$label: $value',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+class _CompareTips extends StatelessWidget {
+  const _CompareTips();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.tips_and_updates_outlined,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Dica: use os links Base e Head para validar individualmente e confirme a diferenca visual no compare lado a lado.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
           ],
         ),
       ),
@@ -371,9 +456,23 @@ class _ComparePanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            SelectableText(
-              url,
-              style: theme.textTheme.bodySmall,
+            Row(
+              children: [
+                Expanded(
+                  child: SelectableText(
+                    url,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Copiar URL',
+                  child: IconButton(
+                    onPressed: () => _copyUrl(context),
+                    icon: const Icon(Icons.copy_rounded),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -392,6 +491,13 @@ class _ComparePanel extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _copyUrl(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: url));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('URL copiada')),
     );
   }
 }
