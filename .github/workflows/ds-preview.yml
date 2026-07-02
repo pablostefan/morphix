@@ -84,6 +84,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./morphix_ds_catalog/build/web
           destination_dir: ${{ env.BRANCH_SLUG }}
+          keep_files: true
 
       - name: Output links
         run: |
