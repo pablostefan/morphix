@@ -51,48 +51,7 @@ jobs:
             CHANGED_FILES="$(git show --pretty='' --name-only "${HEAD_SHA}")"
           fi
 
-            CHANGED_FILES="$CHANGED_FILES" python3 -c "import textwrap; exec(textwrap.dedent('''
-            from pathlib import PurePosixPath
-            import os
-
-            changed_files = [
-              line.strip()
-              for line in os.environ.get('CHANGED_FILES', '').splitlines()
-              if line.strip()
-            ]
-
-            patterns = []
-            with open('.github/ds-preview-paths.txt', encoding='utf-8') as handle:
-              for raw_line in handle:
-                pattern = raw_line.strip()
-                if not pattern or pattern.startswith('#'):
-                  continue
-                patterns.append(pattern)
-
-            matched_files = set()
-            matched_patterns = set()
-
-            for changed_file in changed_files:
-              path = PurePosixPath(changed_file)
-              for pattern in patterns:
-                if path.match(pattern):
-                  matched_files.add(changed_file)
-                  matched_patterns.add(pattern)
-
-            should_run = 'true' if matched_files else 'false'
-
-            with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-              output.write(f'should_run={should_run}\\n')
-              output.write('changed_files<<EOF\\n')
-              output.write('\\n'.join(changed_files))
-              output.write('\\nEOF\\n')
-              output.write('matched_files<<EOF\\n')
-              output.write('\\n'.join(sorted(matched_files)))
-              output.write('\\nEOF\\n')
-              output.write('matched_patterns<<EOF\\n')
-              output.write('\\n'.join(sorted(matched_patterns)))
-              output.write('\\nEOF\\n')
-            '''))"
+              CHANGED_FILES="$CHANGED_FILES" python3 -c "from pathlib import PurePosixPath; import os; changed_files=[line.strip() for line in os.environ.get('CHANGED_FILES', '').splitlines() if line.strip()]; patterns=[line.strip() for line in open('.github/ds-preview-paths.txt', encoding='utf-8') if line.strip() and not line.strip().startswith('#')]; matched_files=sorted({changed_file for changed_file in changed_files for pattern in patterns if PurePosixPath(changed_file).match(pattern)}); matched_patterns=sorted({pattern for changed_file in changed_files for pattern in patterns if PurePosixPath(changed_file).match(pattern)}); should_run='true' if matched_files else 'false'; output=open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8'); output.write(f'should_run={should_run}\n'); output.write('changed_files<<EOF\n' + '\n'.join(changed_files) + '\nEOF\n'); output.write('matched_files<<EOF\n' + '\n'.join(matched_files) + '\nEOF\n'); output.write('matched_patterns<<EOF\n' + '\n'.join(matched_patterns) + '\nEOF\n'); output.close()"
 
       - name: Summary
         run: |
