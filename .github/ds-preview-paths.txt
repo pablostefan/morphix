@@ -1,0 +1,9 @@
+# Um glob por linha. Linhas em branco e comentarios sao ignorados.
+.github/workflows/ds-preview.yml
+.github/ds-preview-paths.txt
+morphix_design_system/**
+morphix_ds_catalog/lib/**
+morphix_ds_catalog/test/**
+morphix_ds_catalog/tool/**
+morphix_ds_catalog/pubspec.yaml
+morphix_ds_catalog/pubspec.lock

@@ -65,6 +65,34 @@ CI valida sincronismo entre previews registrados e `component_ids.txt`.
 No evento de Pull Request, o workflow detecta componentes alterados e publica
 um comentário automático com links de compare lado a lado (base vs head).
 
+## Quando o workflow roda
+
+O workflow `DS Preview` foi limitado para mudanças relevantes do design system.
+
+Os globs configuráveis ficam em `.github/ds-preview-paths.txt`.
+
+Uso esperado:
+
+- adicione um glob por linha;
+- linhas em branco são ignoradas;
+- linhas começando com `#` são comentários.
+
+Exemplo:
+
+```text
+morphix_design_system/**
+morphix_ds_catalog/lib/**
+```
+
+Limitação importante:
+
+- o GitHub Actions não consegue ler `on.paths` diretamente desse arquivo;
+- por isso o workflow usa um gatilho mínimo no YAML e um job inicial de guarda
+	que lê `.github/ds-preview-paths.txt` antes de decidir se roda `publish` e
+	`pr-compare-links`.
+
 Guia de operação:
 
 - `docs/pr-compare.md`
+- `docs/ds-preview-workflow.md`
+

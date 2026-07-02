@@ -2,28 +2,127 @@ name: DS Preview
 
 on:
   push:
+    paths:
+      - '.github/workflows/ds-preview.yml'
+      - '.github/ds-preview-paths.txt'
+      - 'morphix_design_system/**'
+      - 'morphix_ds_catalog/**'
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/ds-preview.yml'
+      - '.github/ds-preview-paths.txt'
+      - 'morphix_design_system/**'
+      - 'morphix_ds_catalog/**'
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
+  detect-relevant-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.filter.outputs.should_run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve diff range
+        id: diff-range
+        run: |
+          if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" == '0000000000000000000000000000000000000000' ]]; then
+            BASE_SHA=''
+          fi
+
+          echo "BASE_SHA=${BASE_SHA}" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=${HEAD_SHA}" >> "$GITHUB_ENV"
+
+      - name: Filter relevant paths
+        id: filter
+        run: |
+          SHOULD_RUN='false'
+          MATCHED_FILES=''
+          MATCHED_PATTERNS=''
+
+          if [[ -n "${BASE_SHA}" ]]; then
+            CHANGED_FILES="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
+          else
+            CHANGED_FILES="$(git show --pretty='' --name-only "${HEAD_SHA}")"
+          fi
+
+          while IFS= read -r changed_file; do
+            [[ -z "${changed_file}" ]] && continue
+
+            while IFS= read -r raw_pattern; do
+              pattern="${raw_pattern#${raw_pattern%%[![:space:]]*}}"
+              pattern="${pattern%${pattern##*[![:space:]]}}"
+
+              [[ -z "${pattern}" ]] && continue
+              [[ "${pattern}" == \#* ]] && continue
+
+              if [[ "${changed_file}" == ${pattern} ]]; then
+                SHOULD_RUN='true'
+                MATCHED_FILES+="${changed_file}"$'\n'
+                MATCHED_PATTERNS+="${pattern}"$'\n'
+                break
+              fi
+            done < .github/ds-preview-paths.txt
+          done <<< "${CHANGED_FILES}"
+
+          {
+            echo "should_run=${SHOULD_RUN}"
+            echo 'changed_files<<EOF'
+            echo "${CHANGED_FILES}"
+            echo 'EOF'
+            echo 'matched_files<<EOF'
+            printf '%s' "${MATCHED_FILES}" | sort -u
+            echo
+            echo 'EOF'
+            echo 'matched_patterns<<EOF'
+            printf '%s' "${MATCHED_PATTERNS}" | sort -u
+            echo
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "should_run: ${{ steps.filter.outputs.should_run }}" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo 'Changed files:' >> "$GITHUB_STEP_SUMMARY"
+          echo '${{ steps.filter.outputs.changed_files }}' >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo 'Matched paths:' >> "$GITHUB_STEP_SUMMARY"
+          echo '${{ steps.filter.outputs.matched_patterns }}' >> "$GITHUB_STEP_SUMMARY"
+
   publish:
-    if: github.event_name == 'push'
+    needs: detect-relevant-changes
+    if: github.event_name == 'push' && needs.detect-relevant-changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Resolve branch slug
+        id: branch
         run: |
           BRANCH_NAME="${GITHUB_REF_NAME}"
           BRANCH_SLUG="$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
           PREVIEW_VERSION="${GITHUB_SHA::12}"
           echo "BRANCH_SLUG=${BRANCH_SLUG}" >> "$GITHUB_ENV"
           echo "PREVIEW_VERSION=${PREVIEW_VERSION}" >> "$GITHUB_ENV"
+          echo "branch_slug=${BRANCH_SLUG}" >> "$GITHUB_OUTPUT"
+          echo "preview_version=${PREVIEW_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -83,7 +182,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./morphix_ds_catalog/build/web
-          destination_dir: ${{ env.BRANCH_SLUG }}
+          destination_dir: ${{ steps.branch.outputs.branch_slug }}
 
       - name: Output links
         run: |
@@ -94,7 +193,8 @@ jobs:
           done < morphix_ds_catalog/tool/component_ids.txt
 
   pr-compare-links:
-    if: github.event_name == 'pull_request'
+    needs: detect-relevant-changes
+    if: github.event_name == 'pull_request' && needs.detect-relevant-changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
