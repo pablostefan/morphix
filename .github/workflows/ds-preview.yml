@@ -48,20 +48,20 @@ jobs:
         run: |
           cd morphix_ds_catalog
           mkdir -p build/web/ds_button
-          cat > build/web/ds_button/index.html <<'EOF'
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ds_button</title>
-  <script>
-    window.location.replace('../?component=ds_button');
-  </script>
-</head>
-<body></body>
-</html>
-EOF
+          printf '%s\n' \
+            '<!doctype html>' \
+            '<html>' \
+            '<head>' \
+            '  <meta charset="utf-8">' \
+            '  <meta name="viewport" content="width=device-width, initial-scale=1">' \
+            '  <title>ds_button</title>' \
+            '  <script>' \
+            "    window.location.replace('../?component=ds_button');" \
+            '  </script>' \
+            '</head>' \
+            '<body></body>' \
+            '</html>' \
+            > build/web/ds_button/index.html
 
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
