@@ -22,6 +22,9 @@ Para evitar cache do navegador entre builds da mesma branch, use o parâmetro
 - Branch: `https://<owner>.github.io/morphix/<branch-slug>/?v=<sha-curto>`
 - Componente: `https://<owner>.github.io/morphix/<branch-slug>/<component-id>?v=<sha-curto>`
 
+O pipeline também aplica cache-busting no bundle web publicado, versionando
+`main.dart.js` com o SHA curto do build.
+
 Exemplo atual:
 
 - `main/ds_button`

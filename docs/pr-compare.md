@@ -53,7 +53,16 @@ Fallback:
 
 - Link abre sem diferenca visual:
   - Verificar se `vbase` e `vhead` estao diferentes.
+  - Confirmar no run de `push` da branch se o passo `Patch web assets cache-busting` executou com sucesso.
   - Forcar refresh do navegador.
 - Sem comentario na PR:
   - Verificar permissao `pull-requests: write` no workflow.
   - Verificar se o job `pr-compare-links` executou sem erro.
+
+## Nota de cache
+
+No job de `push`, o pipeline publica o web build com cache-busting de asset:
+
+- `main.dart.js?v=<sha-curto>`
+
+Isso reduz chance de o navegador reaproveitar bundle antigo da mesma branch durante comparacoes sucessivas em PR.

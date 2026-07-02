@@ -50,6 +50,12 @@ jobs:
           cd morphix_ds_catalog
           flutter build web --release --pwa-strategy=none --base-href "/morphix/${BRANCH_SLUG}/"
 
+      - name: Patch web assets cache-busting
+        run: |
+          cd morphix_ds_catalog
+          sed -i "s#main.dart.js#main.dart.js?v=${PREVIEW_VERSION}#g" build/web/flutter_bootstrap.js
+          sed -i "s#main.dart.js#main.dart.js?v=${PREVIEW_VERSION}#g" build/web/index.html
+
       - name: Create ds_button redirect page
         run: |
           cd morphix_ds_catalog
