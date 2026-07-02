@@ -68,3 +68,4 @@ um comentário automático com links de compare lado a lado (base vs head).
 Guia de operação:
 
 - `docs/pr-compare.md`
+- `docs/morphix-playbook.md` (documentação detalhada de arquitetura, CI/CD, gh-pages e reprodução em outro monorepo)
