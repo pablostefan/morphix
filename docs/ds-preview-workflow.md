@@ -21,10 +21,7 @@ Actions para acordar o workflow apenas quando algo potencialmente relevante muda
 
 Isso cobre:
 
-- `.github/workflows/ds-preview.yml`
-- `.github/ds-preview-paths.txt`
-- `morphix_design_system/**`
-- `morphix_ds_catalog/**`
+- `morphix_design_system/lib/src/widgets/**`
 
 ### 2. Filtro configurável
 
@@ -50,22 +47,14 @@ Regras:
 Exemplo:
 
 ```text
-# package DS
-morphix_design_system/**
-
-# app de preview
-morphix_ds_catalog/lib/**
-morphix_ds_catalog/test/**
-morphix_ds_catalog/tool/**
-morphix_ds_catalog/pubspec.yaml
-morphix_ds_catalog/pubspec.lock
+morphix_design_system/lib/src/widgets/**
 ```
 
 ## Como alterar os paths
 
 1. Edite `.github/ds-preview-paths.txt`.
 2. Faça push.
-3. O próprio workflow será acionado porque esse arquivo faz parte do gatilho mínimo.
+3. Se quiser testar a nova configuração, faça também uma mudança dentro de `morphix_design_system/lib/src/widgets/**`, porque o gatilho mínimo atual está restrito a esse path.
 
 ## Limitação do GitHub Actions
 
@@ -77,8 +66,9 @@ Por isso a configuração é híbrida:
 - `paths` mínimo no YAML;
 - guarda dinâmica no job `detect-relevant-changes`.
 
+No estado atual, os dois lados estão alinhados para aceitar apenas mudanças em widgets do design system.
+
 ## O que validar
 
-1. Mudança fora dos globs: workflow inicia e encerra sem `publish` nem `pr-compare-links`.
-2. Mudança dentro dos globs: workflow segue normalmente.
-3. Mudança no arquivo de config: workflow também inicia.
+1. Mudança fora de `morphix_design_system/lib/src/widgets/**`: o workflow não inicia.
+2. Mudança dentro de `morphix_design_system/lib/src/widgets/**`: o workflow segue normalmente.

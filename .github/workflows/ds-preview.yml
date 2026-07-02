@@ -3,17 +3,11 @@ name: DS Preview
 on:
   push:
     paths:
-      - '.github/workflows/ds-preview.yml'
-      - '.github/ds-preview-paths.txt'
-      - 'morphix_design_system/**'
-      - 'morphix_ds_catalog/**'
+      - 'morphix_design_system/lib/src/widgets/**'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
-      - '.github/workflows/ds-preview.yml'
-      - '.github/ds-preview-paths.txt'
-      - 'morphix_design_system/**'
-      - 'morphix_ds_catalog/**'
+      - 'morphix_design_system/lib/src/widgets/**'
 
 permissions:
   contents: write

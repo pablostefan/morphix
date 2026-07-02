@@ -69,6 +69,10 @@ um comentário automático com links de compare lado a lado (base vs head).
 
 O workflow `DS Preview` foi limitado para mudanças relevantes do design system.
 
+Atualmente, ele só é ativado por mudanças em:
+
+- `morphix_design_system/lib/src/widgets/**`
+
 Os globs configuráveis ficam em `.github/ds-preview-paths.txt`.
 
 Uso esperado:
@@ -80,8 +84,7 @@ Uso esperado:
 Exemplo:
 
 ```text
-morphix_design_system/**
-morphix_ds_catalog/lib/**
+morphix_design_system/lib/src/widgets/**
 ```
 
 Limitação importante:
@@ -90,6 +93,8 @@ Limitação importante:
 - por isso o workflow usa um gatilho mínimo no YAML e um job inicial de guarda
 	que lê `.github/ds-preview-paths.txt` antes de decidir se roda `publish` e
 	`pr-compare-links`.
+
+No estado atual, o gatilho mínimo também está restrito ao mesmo path de widgets.
 
 Guia de operação:
 
