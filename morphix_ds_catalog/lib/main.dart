@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'src/compare_frame.dart';
 import 'src/component_registry.dart';
 import 'src/engine/preview_engine.dart';
+import 'src/review_actions.dart';
 
 void main() {
   runApp(const DsCatalogApp());
@@ -40,6 +41,7 @@ _CatalogRouteState _routeStateFromUrl() {
       headBranch: query['head'] ?? currentBranch,
       baseVersion: query['vbase'] ?? 'latest',
       headVersion: query['vhead'] ?? 'latest',
+      reviewContext: ReviewContext.fromQuery(query),
     );
     return _CatalogRouteState(compareConfig: compareConfig);
   }
@@ -89,6 +91,7 @@ class _CompareConfig {
     required this.headBranch,
     required this.baseVersion,
     required this.headVersion,
+    required this.reviewContext,
   });
 
   final String componentId;
@@ -96,6 +99,7 @@ class _CompareConfig {
   final String headBranch;
   final String baseVersion;
   final String headVersion;
+  final ReviewContext? reviewContext;
 }
 
 class _CatalogHomePage extends StatelessWidget {
@@ -181,10 +185,40 @@ class _CatalogComponentView extends StatelessWidget {
   }
 }
 
-class _CatalogCompareView extends StatelessWidget {
+class _CatalogCompareView extends StatefulWidget {
   const _CatalogCompareView({required this.config});
 
   final _CompareConfig config;
+
+  @override
+  State<_CatalogCompareView> createState() => _CatalogCompareViewState();
+}
+
+class _CatalogCompareViewState extends State<_CatalogCompareView> {
+  final _reviewBodyController = TextEditingController();
+  late final TextEditingController _reviewIdController;
+  final ReviewApiClient _reviewApiClient = ReviewApiClient();
+
+  bool _isSubmitting = false;
+  String? _statusMessage;
+  bool _statusIsError = false;
+
+  _CompareConfig get config => widget.config;
+
+  @override
+  void initState() {
+    super.initState();
+    _reviewIdController = TextEditingController(
+      text: config.reviewContext?.reviewId?.toString() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _reviewBodyController.dispose();
+    _reviewIdController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -219,6 +253,21 @@ class _CatalogCompareView extends StatelessWidget {
             children: [
               _CompareHeader(config: config),
               const SizedBox(height: 12),
+                _ReviewActionsCard(
+                config: config,
+                statusMessage: _statusMessage,
+                statusIsError: _statusIsError,
+                reviewBodyController: _reviewBodyController,
+                reviewIdController: _reviewIdController,
+                isSubmitting: _isSubmitting,
+                backendConfigured: _reviewApiClient.isEnabled,
+                onApprove: () => _submitReviewAction(ReviewActionType.approve),
+                onRequestChanges: () =>
+                  _submitReviewAction(ReviewActionType.requestChanges),
+                onDismissReview: () =>
+                  _submitReviewAction(ReviewActionType.dismiss),
+                ),
+                const SizedBox(height: 12),
               const _CompareTips(),
               const SizedBox(height: 16),
               if (isNarrow) ...[
@@ -289,6 +338,84 @@ class _CatalogCompareView extends StatelessWidget {
         'v': version,
       },
     ).toString();
+  }
+
+  Future<void> _submitReviewAction(ReviewActionType action) async {
+    final reviewContext = config.reviewContext;
+    if (reviewContext == null || !reviewContext.isValid) {
+      _setStatus(
+        message:
+            'Contexto da PR ausente na URL. Esperado: owner, repo e pr nos query params.',
+        isError: true,
+      );
+      return;
+    }
+
+    if (!_reviewApiClient.isEnabled) {
+      _setStatus(
+        message:
+            'Backend de review nao configurado. Defina MORPHIX_REVIEW_API_BASE no build web.',
+        isError: true,
+      );
+      return;
+    }
+
+    final body = _reviewBodyController.text.trim();
+    if ((action == ReviewActionType.requestChanges ||
+            action == ReviewActionType.dismiss) &&
+        body.isEmpty) {
+      _setStatus(
+        message:
+            'Comentario obrigatorio para Solicitar alteracoes e Desaprovar revisao.',
+        isError: true,
+      );
+      return;
+    }
+
+    var reviewCtxForAction = reviewContext;
+    if (action == ReviewActionType.dismiss) {
+      final reviewId = int.tryParse(_reviewIdController.text.trim());
+      if (reviewId == null || reviewId <= 0) {
+        _setStatus(
+          message:
+              'Para desaprovar revisao, informe um review_id valido na caixa acima.',
+          isError: true,
+        );
+        return;
+      }
+      reviewCtxForAction = reviewContext.copyWith(reviewId: reviewId);
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _statusMessage = null;
+    });
+
+    final result = await _reviewApiClient.sendReviewAction(
+      context: reviewCtxForAction,
+      action: action,
+      body: body,
+      componentId: config.componentId,
+      baseBranch: config.baseBranch,
+      headBranch: config.headBranch,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = false;
+      _statusMessage = result.message;
+      _statusIsError = !result.ok;
+    });
+  }
+
+  void _setStatus({required String message, required bool isError}) {
+    setState(() {
+      _statusMessage = message;
+      _statusIsError = isError;
+    });
   }
 }
 
@@ -399,6 +526,147 @@ class _CompareTips extends StatelessWidget {
                 style: theme.textTheme.bodyMedium,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewActionsCard extends StatelessWidget {
+  const _ReviewActionsCard({
+    required this.config,
+    required this.statusMessage,
+    required this.statusIsError,
+    required this.reviewBodyController,
+    required this.reviewIdController,
+    required this.isSubmitting,
+    required this.backendConfigured,
+    required this.onApprove,
+    required this.onRequestChanges,
+    required this.onDismissReview,
+  });
+
+  final _CompareConfig config;
+  final String? statusMessage;
+  final bool statusIsError;
+  final TextEditingController reviewBodyController;
+  final TextEditingController reviewIdController;
+  final bool isSubmitting;
+  final bool backendConfigured;
+  final VoidCallback onApprove;
+  final VoidCallback onRequestChanges;
+  final VoidCallback onDismissReview;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final reviewContext = config.reviewContext;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Review actions', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              'Aprovar, solicitar alteracoes ou desaprovar revisao diretamente do compare.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 10),
+            if (reviewContext == null)
+              Text(
+                'Contexto de PR indisponivel. O link de compare precisa incluir owner, repo e pr.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _MetaChip(
+                    label: 'Repo',
+                    value: '${reviewContext.owner}/${reviewContext.repo}',
+                    color: Colors.blueGrey,
+                  ),
+                  _MetaChip(
+                    label: 'PR',
+                    value: '#${reviewContext.pullNumber}',
+                    color: Colors.indigo,
+                  ),
+                ],
+              ),
+            const SizedBox(height: 12),
+            if (!backendConfigured)
+              Text(
+                'Backend seguro ausente. Defina MORPHIX_REVIEW_API_BASE no build para habilitar as acoes.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            if (!backendConfigured) const SizedBox(height: 10),
+            TextField(
+              controller: reviewBodyController,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Comentario da revisao',
+                hintText:
+                    'Obrigatorio para Solicitar alteracoes e Desaprovar revisao.',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reviewIdController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'review_id (somente para Desaprovar revisao)',
+                hintText: 'Exemplo: 123456789',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.icon(
+                  onPressed: isSubmitting ? null : onApprove,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Aprovar'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: isSubmitting ? null : onRequestChanges,
+                  icon: const Icon(Icons.warning_amber_rounded),
+                  label: const Text('Solicitar alteracoes'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: isSubmitting ? null : onDismissReview,
+                  icon: const Icon(Icons.do_not_disturb_on_outlined),
+                  label: const Text('Desaprovar revisao'),
+                ),
+              ],
+            ),
+            if (isSubmitting) ...[
+              const SizedBox(height: 10),
+              const LinearProgressIndicator(),
+            ],
+            if (statusMessage != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                statusMessage!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: statusIsError
+                      ? theme.colorScheme.error
+                      : Colors.green.shade700,
+                ),
+              ),
+            ],
           ],
         ),
       ),

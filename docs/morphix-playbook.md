@@ -102,7 +102,7 @@ No stub (nao web), renderiza fallback:
 ### 4.2 Compare de PR
 
 - Compare page:
-  `https://<owner>.github.io/<repo>/<head-slug>/?compare=1&component=<id>&base=<base-slug>&head=<head-slug>&vbase=<sha-base-12>&vhead=<sha-head-12>`
+  `https://<owner>.github.io/<repo>/<head-slug>/?compare=1&component=<id>&base=<base-slug>&head=<head-slug>&vbase=<sha-base-12>&vhead=<sha-head-12>&owner=<repo-owner>&repo=<repo-name>&pr=<pr-number>`
 
 - Base direta:
   `https://<owner>.github.io/<repo>/<base-slug>/<component-id>?v=<sha-base-12>`
@@ -155,10 +155,44 @@ Pipeline:
    - Link compare
    - Link base
    - Link head
+  - Contexto de review (`owner`, `repo`, `pr`) embutido no compare URL
 6. Cria ou atualiza comentario unico usando marcador:
    `<!-- morphix-pr-compare -->`
 
-## 6. Catalogo de componentes (governanca)
+## 6. Review actions seguras na pagina de compare
+
+A pagina de compare permite tres acoes de review:
+
+1. `Aprovar` (`APPROVE`)
+2. `Solicitar alteracoes` (`REQUEST_CHANGES`)
+3. `Desaprovar revisao` (`DISMISS` de review existente)
+
+Arquitetura:
+
+1. Frontend (GitHub Pages) apenas coleta contexto da PR e envia request.
+2. Backend seguro executa GitHub REST API de review.
+3. Nenhum token GitHub deve ser exposto no browser.
+
+Config por build do catalogo:
+
+- `MORPHIX_REVIEW_API_BASE` (obrigatorio para habilitar acoes)
+- `MORPHIX_REVIEW_API_KEY` (opcional, para gateway)
+
+Endpoint esperado pela UI:
+
+- `POST {MORPHIX_REVIEW_API_BASE}/github/reviews`
+
+Payload principal:
+
+- `owner`, `repo`, `pull_number`, `event`, `body`, `review_id`
+- Metadados adicionais: `component_id`, `base_branch`, `head_branch`
+
+Observacoes de permissao:
+
+1. `REQUEST_CHANGES` e `APPROVE` seguem regras de reviewer do repositorio.
+2. `DISMISS` pode exigir privilegios mais altos (ex.: admin em branch protegida).
+
+## 7. Catalogo de componentes (governanca)
 
 Fonte canonica de IDs:
 
@@ -177,7 +211,7 @@ Falhas comuns:
 - Componente criado sem entrar no registry.
 - ID novo sem atualizar `component_ids.txt`.
 
-## 7. Cache e consistencia visual
+## 8. Cache e consistencia visual
 
 ### 7.1 Medidas ativas no Morphix
 
@@ -196,7 +230,7 @@ Checklist:
 3. Veja se o `push` job da branch concluiu com sucesso.
 4. Valide que o branch folder existe em `gh-pages`.
 
-## 8. GitHub Pages: pontos criticos
+## 9. GitHub Pages: pontos criticos
 
 Este e o ponto mais sensivel para reproducao em outro repo.
 
@@ -239,7 +273,7 @@ Se voce servir `build/web` localmente sem respeitar `base-href` de producao, pod
 
 Isto nao implica erro de build necessariamente; pode ser mismatch de path local.
 
-## 9. Como reproduzir em outro monorepo (passo a passo)
+## 10. Como reproduzir em outro monorepo (passo a passo)
 
 ### 9.1 Pre-requisitos
 
@@ -298,7 +332,7 @@ Se ja existir configuracao, use `PUT` com o mesmo payload.
 4. Verifique comentario automatico com compare.
 5. Compare Base x Head do componente alterado.
 
-## 10. Matriz de troubleshooting
+## 11. Matriz de troubleshooting
 
 ### 10.1 Workflow verde, links 404
 
@@ -346,7 +380,7 @@ Acao:
 
 - habilitar `keep_files: true` no action de deploy.
 
-## 11. Comandos uteis de operacao
+## 12. Comandos uteis de operacao
 
 Checar runs:
 
@@ -373,7 +407,7 @@ Checar Pages:
 gh api repos/<owner>/<repo>/pages
 ```
 
-## 12. Checklist de migracao para outro repo
+## 13. Checklist de migracao para outro repo
 
 1. [ ] Criar package DS e catalogo web.
 2. [ ] Implementar registry de previews + `component_ids.txt`.
@@ -385,15 +419,16 @@ gh api repos/<owner>/<repo>/pages
 8. [ ] Confirmar comentario automatico e links Base/Head/Compare.
 9. [ ] Documentar comandos de operacao para o time.
 
-## 13. Decisoes atuais do Morphix
+## 14. Decisoes atuais do Morphix
 
 1. Compare e feito por iframe de URLs publicados.
 2. Mapeamento de componente alterado e por padrao de path.
 3. Fallback para todos os componentes quando mapeamento nao encontra IDs.
 4. Cache-busting e feito por versao SHA em URL e assets.
 5. Fonte de verdade de IDs e `component_ids.txt`.
+6. Review actions da compare page dependem de backend seguro configurado por `MORPHIX_REVIEW_API_BASE`.
 
-## 14. Recomendacoes futuras
+## 15. Recomendacoes futuras
 
 1. Adicionar smoke test de URLs publicadas no fim do `publish`.
 2. Adicionar validacao automatica para detectar ausencia de `main/` em `gh-pages`.

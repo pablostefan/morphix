@@ -171,7 +171,7 @@ jobs:
 
           while IFS= read -r component_id; do
             [[ -z "${component_id}" ]] && continue
-            COMPARE_URL="https://pablostefan.github.io/morphix/${HEAD_SLUG}/?compare=1&component=${component_id}&base=${BASE_SLUG}&head=${HEAD_SLUG}&vbase=${BASE_VERSION}&vhead=${HEAD_VERSION}"
+            COMPARE_URL="https://pablostefan.github.io/morphix/${HEAD_SLUG}/?compare=1&component=${component_id}&base=${BASE_SLUG}&head=${HEAD_SLUG}&vbase=${BASE_VERSION}&vhead=${HEAD_VERSION}&owner=${{ github.repository_owner }}&repo=${{ github.event.repository.name }}&pr=${{ github.event.pull_request.number }}"
             BASE_URL="https://pablostefan.github.io/morphix/${BASE_SLUG}/${component_id}?v=${BASE_VERSION}"
             HEAD_URL="https://pablostefan.github.io/morphix/${HEAD_SLUG}/${component_id}?v=${HEAD_VERSION}"
 

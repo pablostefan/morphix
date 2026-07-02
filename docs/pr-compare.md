@@ -24,10 +24,77 @@ O link principal de compare usa:
 - `head=<branch-head-slug>`
 - `vbase=<sha-curto-base>`
 - `vhead=<sha-curto-head>`
+- `owner=<owner-do-repo>`
+- `repo=<nome-do-repo>`
+- `pr=<numero-da-pr>`
 
 Exemplo:
 
-- `https://pablostefan.github.io/morphix/feat-minha-branch/?compare=1&component=ds_button&base=main&head=feat-minha-branch&vbase=abc123def456&vhead=789abc123def`
+- `https://pablostefan.github.io/morphix/feat-minha-branch/?compare=1&component=ds_button&base=main&head=feat-minha-branch&vbase=abc123def456&vhead=789abc123def&owner=pablostefan&repo=morphix&pr=10`
+
+## Review actions na pagina de compare
+
+A tela de compare agora suporta tres acoes de review:
+
+1. `Aprovar` (APPROVE)
+2. `Solicitar alteracoes` (REQUEST_CHANGES)
+3. `Desaprovar revisao` (dismiss de uma review existente)
+
+Importante:
+
+- O compare continua exibindo o comentario automatico da PR como antes.
+- As acoes de review dependem de backend seguro; a pagina web nao deve chamar token GitHub diretamente.
+
+## Contrato de backend para review
+
+A UI faz `POST` para:
+
+- `${MORPHIX_REVIEW_API_BASE}/github/reviews`
+
+Payload enviado:
+
+- `owner`
+- `repo`
+- `pull_number`
+- `event` (`APPROVE`, `REQUEST_CHANGES`, `DISMISS`)
+- `body` (obrigatorio para `REQUEST_CHANGES` e `DISMISS`)
+- `review_id` (obrigatorio para `DISMISS`)
+- `component_id`
+- `base_branch`
+- `head_branch`
+
+Headers:
+
+- `Content-Type: application/json`
+- `Accept: application/json`
+- `X-Morphix-Review-Key` (opcional, se `MORPHIX_REVIEW_API_KEY` for definido no build)
+
+## Build com review actions habilitado
+
+Exemplo local:
+
+```bash
+cd morphix_ds_catalog
+flutter build web \
+  --release \
+  --dart-define=MORPHIX_REVIEW_API_BASE=https://seu-backend.example.com/
+```
+
+Opcionalmente, para chave adicional de gateway:
+
+```bash
+flutter build web \
+  --release \
+  --dart-define=MORPHIX_REVIEW_API_BASE=https://seu-backend.example.com/ \
+  --dart-define=MORPHIX_REVIEW_API_KEY=chave-de-gateway-nao-secreta
+```
+
+## Regras de validacao da UI
+
+1. Sem `owner`, `repo` e `pr` na URL, as acoes ficam sem contexto valido.
+2. `REQUEST_CHANGES` exige comentario.
+3. `DISMISS` exige comentario e `review_id` valido.
+4. Sem `MORPHIX_REVIEW_API_BASE`, a UI exibe erro de backend nao configurado.
 
 ## Mapeamento de componente alterado
 
