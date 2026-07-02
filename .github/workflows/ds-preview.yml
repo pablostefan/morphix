@@ -127,7 +127,10 @@ jobs:
               '  <meta name="viewport" content="width=device-width, initial-scale=1">' \
               "  <title>${component_id}</title>" \
               '  <script>' \
-              "    window.location.replace('../?component=${component_id}&v=${PREVIEW_VERSION}');" \
+              '    const params = new URLSearchParams(window.location.search);' \
+              "    params.set('component', '${component_id}');" \
+              "    params.set('v', '${PREVIEW_VERSION}');" \
+              "    window.location.replace(`../?${params.toString()}`);" \
               '  </script>' \
               '</head>' \
               '<body></body>' \

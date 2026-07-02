@@ -287,6 +287,7 @@ class _CatalogCompareView extends StatelessWidget {
       path: '/morphix/$branch/$componentId',
       queryParameters: {
         'v': version,
+        'cmp': '$branch-$version',
       },
     ).toString();
   }
