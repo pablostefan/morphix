@@ -13,6 +13,8 @@ Formato de URL:
 
 - Branch: `https://<owner>.github.io/morphix/<branch-slug>/`
 - Componente: `https://<owner>.github.io/morphix/<branch-slug>/<component-id>`
+- Compare (main vs branch):
+	`https://<owner>.github.io/morphix/<head-branch-slug>/?compare=1&component=<component-id>&base=<base-branch-slug>&head=<head-branch-slug>&vbase=<sha-curto-base>&vhead=<sha-curto-head>`
 
 Para evitar cache do navegador entre builds da mesma branch, use o parâmetro
 `v` gerado pelo workflow:
@@ -46,3 +48,8 @@ final ComponentSpec dsButtonSpec = ComponentSpec(
 3. Adicione o id em `morphix_ds_catalog/tool/component_ids.txt`.
 
 CI valida sincronismo entre `@CatalogPreview` e `component_ids.txt`.
+
+## Compare em PR
+
+No evento de Pull Request, o workflow detecta componentes alterados e publica
+um comentário automático com links de compare lado a lado (base vs head).
