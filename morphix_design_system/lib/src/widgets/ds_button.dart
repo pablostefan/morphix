@@ -14,7 +14,7 @@ class DsButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
-      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+      style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent),
       onPressed: onPressed,
       child: Text(label),
     );
