@@ -187,6 +187,7 @@ class _CatalogCompareView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final baseUrl = _componentUrl(
       branch: config.baseBranch,
       componentId: config.componentId,
@@ -198,41 +199,76 @@ class _CatalogCompareView extends StatelessWidget {
       version: config.headVersion,
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 1000;
-        if (isNarrow) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            theme.colorScheme.surface,
+          ],
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 1100;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             children: [
-              _ComparePanel(label: 'Base: ${config.baseBranch}', url: baseUrl),
+              _CompareHeader(config: config),
               const SizedBox(height: 16),
-              _ComparePanel(label: 'Head: ${config.headBranch}', url: headUrl),
+              if (isNarrow) ...[
+                _ComparePanel(
+                  label: 'Base',
+                  branch: config.baseBranch,
+                  version: config.baseVersion,
+                  url: baseUrl,
+                  accentColor: Colors.teal,
+                  frameHeight: 520,
+                ),
+                const SizedBox(height: 16),
+                _ComparePanel(
+                  label: 'Head',
+                  branch: config.headBranch,
+                  version: config.headVersion,
+                  url: headUrl,
+                  accentColor: Colors.deepOrange,
+                  frameHeight: 520,
+                ),
+              ] else
+                SizedBox(
+                  height: 760,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _ComparePanel(
+                          label: 'Base',
+                          branch: config.baseBranch,
+                          version: config.baseVersion,
+                          url: baseUrl,
+                          accentColor: Colors.teal,
+                          frameHeight: 640,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _ComparePanel(
+                          label: 'Head',
+                          branch: config.headBranch,
+                          version: config.headVersion,
+                          url: headUrl,
+                          accentColor: Colors.deepOrange,
+                          frameHeight: 640,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           );
-        }
-
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _ComparePanel(
-                  label: 'Base: ${config.baseBranch}',
-                  url: baseUrl,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _ComparePanel(
-                  label: 'Head: ${config.headBranch}',
-                  url: headUrl,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -253,30 +289,105 @@ class _CatalogCompareView extends StatelessWidget {
   }
 }
 
-class _ComparePanel extends StatelessWidget {
-  const _ComparePanel({required this.label, required this.url});
+class _CompareHeader extends StatelessWidget {
+  const _CompareHeader({required this.config});
 
-  final String label;
-  final String url;
+  final _CompareConfig config;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              label,
-              style: Theme.of(context).textTheme.titleMedium,
+              'Comparando componente ${config.componentId}',
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Base ${config.baseBranch} (${config.baseVersion}) x Head ${config.headBranch} (${config.headVersion})',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ComparePanel extends StatelessWidget {
+  const _ComparePanel({
+    required this.label,
+    required this.branch,
+    required this.version,
+    required this.url,
+    required this.accentColor,
+    required this.frameHeight,
+  });
+
+  final String label;
+  final String branch;
+  final String version;
+  final String url;
+  final Color accentColor;
+  final double frameHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$label: $branch',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: accentColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'versao: $version',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
-            SelectableText(url),
+            SelectableText(
+              url,
+              style: theme.textTheme.bodySmall,
+            ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 620,
-              child: CompareFrame(url: url),
+              height: frameHeight,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CompareFrame(url: url),
+                ),
+              ),
             ),
           ],
         ),
