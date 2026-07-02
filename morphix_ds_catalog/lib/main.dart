@@ -245,9 +245,8 @@ class _CatalogCompareView extends StatelessWidget {
       scheme: Uri.base.scheme,
       host: Uri.base.host,
       port: Uri.base.hasPort ? Uri.base.port : null,
-      path: '/morphix/$branch/',
+      path: '/morphix/$branch/$componentId',
       queryParameters: {
-        'component': componentId,
         'v': version,
       },
     ).toString();
