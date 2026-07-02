@@ -2,8 +2,6 @@ name: DS Preview
 
 on:
   push:
-    branches:
-      - '**'
 
 permissions:
   contents: write
