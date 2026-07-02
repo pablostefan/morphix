@@ -51,7 +51,7 @@ jobs:
             CHANGED_FILES="$(git show --pretty='' --name-only "${HEAD_SHA}")"
           fi
 
-          CHANGED_FILES="$CHANGED_FILES" python3 - <<'PY'
+            CHANGED_FILES="$CHANGED_FILES" python3 -c "import textwrap; exec(textwrap.dedent('''
             from pathlib import PurePosixPath
             import os
 
@@ -82,17 +82,17 @@ jobs:
             should_run = 'true' if matched_files else 'false'
 
             with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-              output.write(f'should_run={should_run}\n')
-              output.write('changed_files<<EOF\n')
-              output.write('\n'.join(changed_files))
-              output.write('\nEOF\n')
-              output.write('matched_files<<EOF\n')
-              output.write('\n'.join(sorted(matched_files)))
-              output.write('\nEOF\n')
-              output.write('matched_patterns<<EOF\n')
-              output.write('\n'.join(sorted(matched_patterns)))
-              output.write('\nEOF\n')
-            PY
+              output.write(f'should_run={should_run}\\n')
+              output.write('changed_files<<EOF\\n')
+              output.write('\\n'.join(changed_files))
+              output.write('\\nEOF\\n')
+              output.write('matched_files<<EOF\\n')
+              output.write('\\n'.join(sorted(matched_files)))
+              output.write('\\nEOF\\n')
+              output.write('matched_patterns<<EOF\\n')
+              output.write('\\n'.join(sorted(matched_patterns)))
+              output.write('\\nEOF\\n')
+            '''))"
 
       - name: Summary
         run: |
