@@ -1,30 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:morphix_design_system/morphix_design_system.dart';
+import 'components/ds_button_preview.dart';
+import 'engine/preview_engine.dart';
 
 /// Registro canonico de componentes publicados no catalogo.
-final List<ComponentSpec> componentSpecs = [
-  ComponentSpec(
-    id: 'ds_button',
-    title: 'DS Button',
-    description: 'Botao base do design system.',
-    builder: (context) => DsButton(label: 'Continuar', onPressed: () {}),
-  ),
-];
+final List<CatalogPreview> catalogComponents = [buildDsButtonPreview()];
 
-final Map<String, ComponentSpec> componentSpecById = {
-  for (final spec in componentSpecs) spec.id: spec,
+final Map<String, CatalogPreview> catalogComponentById = {
+  for (final component in catalogComponents) component.id: component,
 };
-
-class ComponentSpec {
-  const ComponentSpec({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.builder,
-  });
-
-  final String id;
-  final String title;
-  final String description;
-  final WidgetBuilder builder;
-}

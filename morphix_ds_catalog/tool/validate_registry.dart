@@ -1,57 +1,62 @@
 import 'dart:io';
 
-final _previewRegex = RegExp(r'@dsPreview\(id:\s*([a-z0-9_]+)');
-final _registryRegex = RegExp(r"id:\s*'([a-z0-9_]+)'");
+final _catalogIdRegex = RegExp(r"id:\s*'([a-z0-9_]+)'");
 
 void main() {
-  final repoRoot = Directory.current.parent;
-  final widgetsDir = Directory(
-    '${repoRoot.path}/morphix_design_system/lib/src/widgets',
+  final componentsDir = Directory(
+    '${Directory.current.path}/lib/src/components',
   );
-  final registryFile = File(
-    '${Directory.current.path}/lib/src/component_registry.dart',
+  final componentIdsFile = File(
+    '${Directory.current.path}/tool/component_ids.txt',
   );
 
-  if (!widgetsDir.existsSync()) {
+  if (!componentsDir.existsSync()) {
     stderr.writeln(
-      'Erro: pasta de widgets nao encontrada em ${widgetsDir.path}.',
+      'Erro: pasta components nao encontrada em ${componentsDir.path}.',
     );
     exit(1);
   }
 
-  if (!registryFile.existsSync()) {
+  if (!componentIdsFile.existsSync()) {
     stderr.writeln(
-      'Erro: arquivo de registry nao encontrado em ${registryFile.path}.',
+      'Erro: arquivo de ids nao encontrado em ${componentIdsFile.path}.',
     );
     exit(1);
   }
 
-  final previewIds = <String>{};
-  for (final entity in widgetsDir.listSync(recursive: true)) {
+  final declaredIds = <String>{};
+  for (final entity in componentsDir.listSync(recursive: true)) {
     if (entity is! File || !entity.path.endsWith('.dart')) {
       continue;
     }
 
     final content = entity.readAsStringSync();
-    for (final match in _previewRegex.allMatches(content)) {
-      previewIds.add(match.group(1)!);
+    for (final match in _catalogIdRegex.allMatches(content)) {
+      declaredIds.add(match.group(1)!);
     }
   }
 
-  final registryContent = registryFile.readAsStringSync();
-  final registryIds = {
-    for (final match in _registryRegex.allMatches(registryContent))
-      match.group(1)!,
+  final listedIds = {
+    for (final line in componentIdsFile.readAsLinesSync())
+      if (line.trim().isNotEmpty) line.trim(),
   };
 
-  final missingInRegistry = previewIds.difference(registryIds).toList()..sort();
+  final missingInCode = listedIds.difference(declaredIds).toList()..sort();
+  final missingInList = declaredIds.difference(listedIds).toList()..sort();
 
-  if (missingInRegistry.isNotEmpty) {
+  if (missingInCode.isNotEmpty) {
     stderr.writeln(
-      'Erro: ids anotados sem registry: ${missingInRegistry.join(', ')}',
+      'Erro: ids em component_ids.txt sem CatalogPreview declarado: ${missingInCode.join(', ')}',
     );
     exit(1);
   }
 
-  stdout.writeln('OK: registry cobre todos ids @dsPreview.');
+  if (missingInList.isNotEmpty) {
+    stderr.writeln(
+      'Erro: ids de CatalogPreview ausentes em component_ids.txt: ${missingInList.join(', ')}',
+    );
+    exit(1);
+  }
+
+  stdout.writeln('OK: CatalogPreview e component_ids.txt sincronizados.');
 }

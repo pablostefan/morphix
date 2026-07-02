@@ -20,13 +20,23 @@ Exemplo atual:
 
 ## Adicionar novo componente
 
-1. No componente do DS, adicione doc comment com id:
+1. Defina anotacao de preview no arquivo do componente em `morphix_ds_catalog/lib/src/components/`, por exemplo `morphix_ds_catalog/lib/src/components/ds_button_preview.dart`.
 
 ```dart
-/// @dsPreview(id: ds_button, title: DS Button)
+@CatalogPreview(
+	id: 'ds_button',
+	title: 'DS Button',
+	description: 'Botao base do design system.',
+)
+final ComponentSpec dsButtonSpec = ComponentSpec(
+	builder: (context) => DsButton(
+		label: 'Continuar',
+		onPressed: () {},
+	),
+)
 ```
 
-2. Registre no catalogo em `morphix_ds_catalog/lib/src/component_registry.dart`.
+2. Exporte no registry em `morphix_ds_catalog/lib/src/component_registry.dart`.
 3. Adicione o id em `morphix_ds_catalog/tool/component_ids.txt`.
 
-CI valida que todo id anotado em `@dsPreview` existe no registry.
+CI valida sincronismo entre `@CatalogPreview` e `component_ids.txt`.

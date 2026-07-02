@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'src/component_registry.dart';
+import 'src/engine/preview_engine.dart';
 
 void main() {
   runApp(const DsCatalogApp());
@@ -26,7 +27,7 @@ class DsCatalogApp extends StatelessWidget {
 String? _selectedComponentIdFromUrl() {
   final componentFromQuery = Uri.base.queryParameters['component'];
   if (componentFromQuery != null &&
-      componentSpecById.containsKey(componentFromQuery)) {
+      catalogComponentById.containsKey(componentFromQuery)) {
     return componentFromQuery;
   }
 
@@ -35,7 +36,7 @@ String? _selectedComponentIdFromUrl() {
       .toList();
   if (segments.length >= 3) {
     final candidate = segments.last;
-    if (componentSpecById.containsKey(candidate)) {
+    if (catalogComponentById.containsKey(candidate)) {
       return candidate;
     }
   }
@@ -52,7 +53,7 @@ class CatalogHomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = selectedComponentId == null
         ? null
-        : componentSpecById[selectedComponentId!];
+        : catalogComponentById[selectedComponentId!];
 
     return Scaffold(
       appBar: AppBar(
@@ -64,7 +65,7 @@ class CatalogHomePage extends StatelessWidget {
       ),
       body: selected == null
           ? const _CatalogIndexView()
-          : _CatalogComponentView(spec: selected),
+          : _CatalogComponentView(component: selected),
     );
   }
 }
@@ -76,15 +77,15 @@ class _CatalogIndexView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: componentSpecs.length,
+      itemCount: catalogComponents.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final spec = componentSpecs[index];
+        final component = catalogComponents[index];
         return Card(
           child: ListTile(
-            title: Text(spec.title),
-            subtitle: Text(spec.description),
-            trailing: Text('/${spec.id}'),
+            title: Text(component.title),
+            subtitle: Text(component.description),
+            trailing: Text('/${component.id}'),
           ),
         );
       },
@@ -93,9 +94,9 @@ class _CatalogIndexView extends StatelessWidget {
 }
 
 class _CatalogComponentView extends StatelessWidget {
-  const _CatalogComponentView({required this.spec});
+  const _CatalogComponentView({required this.component});
 
-  final ComponentSpec spec;
+  final CatalogPreview component;
 
   @override
   Widget build(BuildContext context) {
@@ -103,9 +104,9 @@ class _CatalogComponentView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(spec.description),
+          Text(component.description),
           const SizedBox(height: 16),
-          spec.builder(context),
+          component.build(context),
         ],
       ),
     );
