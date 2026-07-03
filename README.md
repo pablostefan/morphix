@@ -69,3 +69,19 @@ Guia de operação:
 
 - `docs/pr-compare.md`
 - `docs/morphix-playbook.md` (documentação detalhada de arquitetura, CI/CD, gh-pages e reprodução em outro monorepo)
+
+## Pipeline Azure (híbrido)
+
+Arquivo base de migração para Azure Pipelines:
+
+- `pipelines/morphix-ds-preview.yml`
+
+Esse pipeline mantém o mesmo comportamento do workflow atual:
+
+1. Publicação de preview por branch em `gh-pages/<branch-slug>`.
+2. Cache-busting por SHA curto (`?v=<sha-12>`).
+3. Comentário idempotente na PR com marcador `<!-- morphix-pr-compare -->`.
+
+Segredo obrigatório no Azure:
+
+- `github.pat` (PAT técnico com permissão para push em `gh-pages` e comentário de PR no repositório)

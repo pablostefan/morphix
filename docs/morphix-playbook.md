@@ -434,3 +434,38 @@ gh api repos/<owner>/<repo>/pages
 2. Adicionar validacao automatica para detectar ausencia de `main/` em `gh-pages`.
 3. Publicar changelog de componentes no comentario da PR.
 4. Criar script de bootstrap para reproduzir o setup em novos monorepos.
+
+## 16. Operacao no Azure Pipelines (hibrido)
+
+Pipeline de referencia:
+
+- `pipelines/morphix-ds-preview.yml`
+
+Modelo operacional:
+
+1. Repositorio e PR continuam no GitHub.
+2. CI/CD roda no Azure Pipelines.
+3. Deploy continua no GitHub Pages (`gh-pages`).
+
+Paridade funcional implementada na pipeline Azure:
+
+1. `push` publica preview por branch em `gh-pages/<branch-slug>`.
+2. `pull_request` gera/upserta comentario com links `Compare/Base/Head`.
+3. Detecta componentes alterados pelos mesmos paths do workflow GitHub.
+4. Fallback para todos os IDs em `morphix_ds_catalog/tool/component_ids.txt`.
+
+Variaveis importantes no YAML:
+
+1. `PAGES_BASE_URL`
+2. `GITHUB_OWNER`
+3. `GITHUB_REPO`
+
+Segredo obrigatorio no Azure:
+
+1. `github.pat` (PAT tecnico usado para push em `gh-pages` e upsert de comentario via GitHub REST API)
+
+Checklist de cutover:
+
+1. Rodar a pipeline Azure em paralelo ao workflow GitHub por alguns dias.
+2. Validar links de preview e comentario da PR em ambos os fluxos.
+3. Desativar trigger de `.github/workflows/ds-preview.yml` quando Azure estiver estavel.

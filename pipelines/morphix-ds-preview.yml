@@ -1,0 +1,317 @@
+name: morphix-ds-preview-$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - '*'
+  paths:
+    include:
+      - morphix_design_system/**
+      - morphix_ds_catalog/**
+      - .github/workflows/ds-preview.yml
+      - pipelines/morphix-ds-preview.yml
+
+pr:
+  branches:
+    include:
+      - '*'
+  paths:
+    include:
+      - morphix_design_system/**
+      - morphix_ds_catalog/**
+      - .github/workflows/ds-preview.yml
+      - pipelines/morphix-ds-preview.yml
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  FLUTTER_VERSION: 3.24.0
+  GH_PAGES_BRANCH: gh-pages
+  PAGES_BASE_URL: https://pablostefan.github.io/morphix
+  GITHUB_OWNER: pablostefan
+  GITHUB_REPO: morphix
+
+stages:
+  - stage: publish_preview
+    displayName: Publish Branch Preview
+    condition: ne(variables['Build.Reason'], 'PullRequest')
+    jobs:
+      - job: publish
+        displayName: Build and Deploy to gh-pages
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - bash: |
+              set -euo pipefail
+
+              BRANCH_NAME="${BUILD_SOURCEBRANCH#refs/heads/}"
+              BRANCH_SLUG="$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
+              PREVIEW_VERSION="${BUILD_SOURCEVERSION:0:12}"
+
+              echo "Resolved branch: ${BRANCH_NAME}"
+              echo "Resolved slug: ${BRANCH_SLUG}"
+              echo "Resolved version: ${PREVIEW_VERSION}"
+
+              echo "##vso[task.setvariable variable=BRANCH_NAME]${BRANCH_NAME}"
+              echo "##vso[task.setvariable variable=BRANCH_SLUG]${BRANCH_SLUG}"
+              echo "##vso[task.setvariable variable=PREVIEW_VERSION]${PREVIEW_VERSION}"
+            displayName: Resolve branch context
+
+          - bash: |
+              set -euo pipefail
+
+              curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" -o flutter.tar.xz
+              tar -xf flutter.tar.xz
+              echo "##vso[task.prependpath]$(pwd)/flutter/bin"
+              flutter --version
+            displayName: Setup Flutter
+
+          - bash: |
+              set -euo pipefail
+
+              cd morphix_ds_catalog
+              flutter pub get
+              dart run tool/validate_registry.dart
+              flutter test
+            displayName: Install deps, validate registry and test
+
+          - bash: |
+              set -euo pipefail
+
+              cd morphix_ds_catalog
+              flutter build web --release --pwa-strategy=none --base-href "/morphix/${BRANCH_SLUG}/"
+            displayName: Build web
+
+          - bash: |
+              set -euo pipefail
+
+              cd morphix_ds_catalog
+
+              sed -i "s#main.dart.js#main.dart.js?v=${PREVIEW_VERSION}#g" build/web/flutter_bootstrap.js
+              sed -i "s#main.dart.js#main.dart.js?v=${PREVIEW_VERSION}#g" build/web/index.html
+
+              while IFS= read -r component_id; do
+                [[ -z "${component_id}" ]] && continue
+                mkdir -p "build/web/${component_id}"
+                cat > "build/web/${component_id}/index.html" <<EOF
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${component_id}</title>
+  <script>
+    window.location.replace('../?component=${component_id}&v=${PREVIEW_VERSION}');
+  </script>
+</head>
+<body></body>
+</html>
+EOF
+              done < tool/component_ids.txt
+            displayName: Patch cache-busting and create redirects
+
+          - bash: |
+              set -euo pipefail
+
+              if [[ -z "${GITHUB_PAT:-}" ]]; then
+                echo "GITHUB_PAT secret is required to deploy to gh-pages"
+                exit 1
+              fi
+
+              TMP_DIR="$(mktemp -d)"
+              REMOTE_URL="https://x-access-token:${GITHUB_PAT}@github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git"
+
+              git clone "${REMOTE_URL}" "${TMP_DIR}"
+              cd "${TMP_DIR}"
+
+              if git ls-remote --exit-code --heads origin "${GH_PAGES_BRANCH}" >/dev/null 2>&1; then
+                git fetch origin "${GH_PAGES_BRANCH}:${GH_PAGES_BRANCH}"
+                git checkout "${GH_PAGES_BRANCH}"
+              else
+                git checkout --orphan "${GH_PAGES_BRANCH}"
+                git rm -rf . || true
+              fi
+
+              mkdir -p "${BRANCH_SLUG}"
+              rsync -a --delete "${BUILD_SOURCESDIRECTORY}/morphix_ds_catalog/build/web/" "${BRANCH_SLUG}/"
+
+              git config user.email "azure-pipelines@morphix.local"
+              git config user.name "Azure Pipelines"
+
+              git add "${BRANCH_SLUG}"
+
+              if git diff --cached --quiet; then
+                echo "No changes to publish for ${BRANCH_SLUG}."
+                exit 0
+              fi
+
+              git commit -m "Deploy ${BRANCH_SLUG} at ${PREVIEW_VERSION}"
+              git push origin "${GH_PAGES_BRANCH}"
+            env:
+              GITHUB_PAT: $(github.pat)
+            displayName: Deploy branch folder to gh-pages
+
+          - bash: |
+              set -euo pipefail
+
+              echo "Branch preview: ${PAGES_BASE_URL}/${BRANCH_SLUG}/?v=${PREVIEW_VERSION}"
+              while IFS= read -r component_id; do
+                [[ -z "${component_id}" ]] && continue
+                echo "- ${PAGES_BASE_URL}/${BRANCH_SLUG}/${component_id}?v=${PREVIEW_VERSION}"
+              done < morphix_ds_catalog/tool/component_ids.txt
+            displayName: Output preview links
+
+  - stage: pr_compare_links
+    displayName: Create/Update PR Compare Comment
+    condition: eq(variables['Build.Reason'], 'PullRequest')
+    jobs:
+      - job: pr_comment
+        displayName: Upsert compare links comment on PR
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - bash: |
+              set -euo pipefail
+
+              if [[ -z "${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-}" ]]; then
+                echo "System.PullRequest.PullRequestNumber is required for PR runs"
+                exit 1
+              fi
+
+              BASE_REF_RAW="${SYSTEM_PULLREQUEST_TARGETBRANCH}"
+              HEAD_REF_RAW="${SYSTEM_PULLREQUEST_SOURCEBRANCH}"
+
+              BASE_REF="${BASE_REF_RAW#refs/heads/}"
+              HEAD_REF="${HEAD_REF_RAW#refs/heads/}"
+
+              git fetch origin "${BASE_REF}" "${HEAD_REF}" --depth=1
+
+              BASE_SHA="$(git rev-parse "origin/${BASE_REF}")"
+              HEAD_SHA="$(git rev-parse "origin/${HEAD_REF}")"
+
+              BASE_VERSION="${BASE_SHA:0:12}"
+              HEAD_VERSION="${HEAD_SHA:0:12}"
+
+              BASE_SLUG="$(echo "${BASE_REF}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
+              HEAD_SLUG="$(echo "${HEAD_REF}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
+
+              echo "##vso[task.setvariable variable=BASE_REF]${BASE_REF}"
+              echo "##vso[task.setvariable variable=HEAD_REF]${HEAD_REF}"
+              echo "##vso[task.setvariable variable=BASE_VERSION]${BASE_VERSION}"
+              echo "##vso[task.setvariable variable=HEAD_VERSION]${HEAD_VERSION}"
+              echo "##vso[task.setvariable variable=BASE_SLUG]${BASE_SLUG}"
+              echo "##vso[task.setvariable variable=HEAD_SLUG]${HEAD_SLUG}"
+            displayName: Resolve PR context
+
+          - bash: |
+              set -euo pipefail
+
+              CHANGED_FILES="$(git diff --name-only "origin/${BASE_REF}" "origin/${HEAD_REF}")"
+
+              declare -A IDS
+              while IFS= read -r file; do
+                [[ -z "${file}" ]] && continue
+
+                if [[ "${file}" =~ ^morphix_ds_catalog/lib/src/components/(.+)_preview\.dart$ ]]; then
+                  IDS["${BASH_REMATCH[1]}"]=1
+                  continue
+                fi
+
+                if [[ "${file}" =~ ^morphix_design_system/lib/src/widgets/(.+)\.dart$ ]]; then
+                  IDS["${BASH_REMATCH[1]}"]=1
+                  continue
+                fi
+              done <<< "${CHANGED_FILES}"
+
+              if [[ ${#IDS[@]} -eq 0 ]]; then
+                while IFS= read -r component_id; do
+                  [[ -z "${component_id}" ]] && continue
+                  IDS["${component_id}"]=1
+                done < morphix_ds_catalog/tool/component_ids.txt
+              fi
+
+              printf '%s\n' "${!IDS[@]}" | sort | uniq > changed_component_ids.txt
+
+              echo "Detected component IDs:"
+              cat changed_component_ids.txt
+            displayName: Detect changed component IDs
+
+          - bash: |
+              set -euo pipefail
+
+              COMMENT_FILE=pr-compare-comment.md
+              {
+                echo '<!-- morphix-pr-compare -->'
+                echo '## Morphix Component Compare'
+                echo
+                echo "Base branch: ${BASE_REF}"
+                echo "Head branch: ${HEAD_REF}"
+                echo
+                echo 'Componentes alterados nesta PR:'
+              } > "${COMMENT_FILE}"
+
+              while IFS= read -r component_id; do
+                [[ -z "${component_id}" ]] && continue
+
+                COMPARE_URL="${PAGES_BASE_URL}/${HEAD_SLUG}/?compare=1&component=${component_id}&base=${BASE_SLUG}&head=${HEAD_SLUG}&vbase=${BASE_VERSION}&vhead=${HEAD_VERSION}&owner=${GITHUB_OWNER}&repo=${GITHUB_REPO}&pr=${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
+                BASE_URL="${PAGES_BASE_URL}/${BASE_SLUG}/${component_id}?v=${BASE_VERSION}"
+                HEAD_URL="${PAGES_BASE_URL}/${HEAD_SLUG}/${component_id}?v=${HEAD_VERSION}"
+
+                {
+                  echo "- **${component_id}**"
+                  echo "  - Compare: ${COMPARE_URL}"
+                  echo "  - Base: ${BASE_URL}"
+                  echo "  - Head: ${HEAD_URL}"
+                } >> "${COMMENT_FILE}"
+              done < changed_component_ids.txt
+
+              {
+                echo
+                echo "PR run: ${SYSTEM_TEAMFOUNDATIONCOLLECTIONURI}${SYSTEM_TEAMPROJECT}/_build/results?buildId=${BUILD_BUILDID}"
+              } >> "${COMMENT_FILE}"
+
+              echo "Generated comment body:"
+              cat "${COMMENT_FILE}"
+            displayName: Build PR comment body
+
+          - bash: |
+              set -euo pipefail
+
+              if [[ -z "${GITHUB_PAT:-}" ]]; then
+                echo "GITHUB_PAT secret is required to upsert PR comments"
+                exit 1
+              fi
+
+              API_BASE="https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}"
+              COMMENTS_URL="${API_BASE}/issues/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}/comments"
+              MARKER='<!-- morphix-pr-compare -->'
+
+              COMMENTS_JSON="$(curl -fsSL -H "Authorization: Bearer ${GITHUB_PAT}" -H "Accept: application/vnd.github+json" "${COMMENTS_URL}?per_page=100")"
+
+              EXISTING_ID="$(echo "${COMMENTS_JSON}" | jq -r --arg marker "${MARKER}" '.[] | select(.body | contains($marker)) | .id' | head -n1)"
+
+              BODY_JSON="$(jq -Rs '{body: .}' < pr-compare-comment.md)"
+
+              if [[ -n "${EXISTING_ID}" && "${EXISTING_ID}" != "null" ]]; then
+                echo "Updating existing PR comment: ${EXISTING_ID}"
+                curl -fsSL -X PATCH \
+                  -H "Authorization: Bearer ${GITHUB_PAT}" \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Content-Type: application/json" \
+                  "${API_BASE}/issues/comments/${EXISTING_ID}" \
+                  -d "${BODY_JSON}" >/dev/null
+              else
+                echo "Creating new PR comment"
+                curl -fsSL -X POST \
+                  -H "Authorization: Bearer ${GITHUB_PAT}" \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Content-Type: application/json" \
+                  "${COMMENTS_URL}" \
+                  -d "${BODY_JSON}" >/dev/null
+              fi
+            env:
+              GITHUB_PAT: $(github.pat)
+            displayName: Create or update PR comment
