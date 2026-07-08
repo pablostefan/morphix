@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'src/compare_frame.dart';
 import 'src/component_registry.dart';
 import 'src/engine/preview_engine.dart';
+import 'src/figma/index.dart';
 import 'src/review_actions.dart';
 
 void main() {
@@ -30,6 +31,7 @@ class DsCatalogApp extends StatelessWidget {
 _CatalogRouteState _routeStateFromUrl() {
   final query = Uri.base.queryParameters;
   final componentFromQuery = query['component'];
+  final figmaFromQuery = query['figma'];
 
   if (query['compare'] == '1' &&
       componentFromQuery != null &&
@@ -49,6 +51,10 @@ _CatalogRouteState _routeStateFromUrl() {
   if (componentFromQuery != null &&
       catalogComponentById.containsKey(componentFromQuery)) {
     return _CatalogRouteState(selectedComponentId: componentFromQuery);
+  }
+
+  if (figmaFromQuery != null && registeredFigmaFileById.containsKey(figmaFromQuery)) {
+    return _CatalogRouteState(selectedFigmaFileId: figmaFromQuery);
   }
 
   final segments = Uri.base.pathSegments
@@ -77,10 +83,12 @@ String _currentBranchSlug() {
 class _CatalogRouteState {
   const _CatalogRouteState({
     this.selectedComponentId,
+    this.selectedFigmaFileId,
     this.compareConfig,
   });
 
   final String? selectedComponentId;
+  final String? selectedFigmaFileId;
   final _CompareConfig? compareConfig;
 }
 
@@ -112,18 +120,22 @@ class _CatalogHomePage extends StatelessWidget {
     final selected = routeState.selectedComponentId == null
         ? null
         : catalogComponentById[routeState.selectedComponentId!];
+    final selectedFigma = routeState.selectedFigmaFileId == null
+        ? null
+        : registeredFigmaFileById[routeState.selectedFigmaFileId!];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titleForState(selected)),
-      ),
-      body: _buildBody(selected),
+      appBar: AppBar(title: Text(_titleForState(selected, selectedFigma))),
+      body: _buildBody(selected, selectedFigma),
     );
   }
 
-  String _titleForState(CatalogPreview? selected) {
+  String _titleForState(CatalogPreview? selected, RegisteredFigmaFile? figmaFile) {
     if (routeState.compareConfig != null) {
       return 'Morphix DS Compare';
+    }
+    if (figmaFile != null) {
+      return 'Morphix DS - ${figmaFile.title}';
     }
     if (selected != null) {
       return 'Morphix DS - ${selected.title}';
@@ -131,9 +143,12 @@ class _CatalogHomePage extends StatelessWidget {
     return 'Morphix DS Catalog';
   }
 
-  Widget _buildBody(CatalogPreview? selected) {
+  Widget _buildBody(CatalogPreview? selected, RegisteredFigmaFile? figmaFile) {
     if (routeState.compareConfig != null) {
       return _CatalogCompareView(config: routeState.compareConfig!);
+    }
+    if (figmaFile != null) {
+      return FigmaPageView(fileId: figmaFile.fileId);
     }
     if (selected == null) {
       return const _CatalogIndexView();
@@ -147,20 +162,48 @@ class _CatalogIndexView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      itemCount: catalogComponents.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final component = catalogComponents[index];
-        return Card(
-          child: ListTile(
-            title: Text(component.title),
-            subtitle: Text(component.description),
-            trailing: Text('/${component.id}'),
+      children: [
+        Text('Componentes', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        for (final component in catalogComponents) ...[
+          Card(
+            child: ListTile(
+              title: Text(component.title),
+              subtitle: Text(component.description),
+              trailing: Text('/${component.id}'),
+            ),
           ),
-        );
-      },
+          const SizedBox(height: 8),
+        ],
+        const SizedBox(height: 16),
+        Text(
+          'Referencias Figma',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        for (final file in registeredFigmaFiles) ...[
+          Card(
+            child: ListTile(
+              title: Text(file.title),
+              subtitle: Text(file.description ?? file.fileId),
+              trailing: Text('?figma=${file.id}'),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: Text('Morphix DS - ${file.title}')),
+                      body: FigmaPageView(fileId: file.fileId),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
     );
   }
 }
@@ -184,6 +227,8 @@ class _CatalogComponentView extends StatelessWidget {
     );
   }
 }
+
+
 
 class _CatalogCompareView extends StatefulWidget {
   const _CatalogCompareView({required this.config});
@@ -253,7 +298,7 @@ class _CatalogCompareViewState extends State<_CatalogCompareView> {
             children: [
               _CompareHeader(config: config),
               const SizedBox(height: 12),
-                _ReviewActionsCard(
+              _ReviewActionsCard(
                 config: config,
                 statusMessage: _statusMessage,
                 statusIsError: _statusIsError,
@@ -263,11 +308,11 @@ class _CatalogCompareViewState extends State<_CatalogCompareView> {
                 backendConfigured: _reviewApiClient.isEnabled,
                 onApprove: () => _submitReviewAction(ReviewActionType.approve),
                 onRequestChanges: () =>
-                  _submitReviewAction(ReviewActionType.requestChanges),
+                    _submitReviewAction(ReviewActionType.requestChanges),
                 onDismissReview: () =>
-                  _submitReviewAction(ReviewActionType.dismiss),
-                ),
-                const SizedBox(height: 12),
+                    _submitReviewAction(ReviewActionType.dismiss),
+              ),
+              const SizedBox(height: 12),
               const _CompareTips(),
               const SizedBox(height: 16),
               if (isNarrow) ...[
@@ -334,9 +379,7 @@ class _CatalogCompareViewState extends State<_CatalogCompareView> {
       host: Uri.base.host,
       port: Uri.base.hasPort ? Uri.base.port : null,
       path: '/morphix/$branch/$componentId',
-      queryParameters: {
-        'v': version,
-      },
+      queryParameters: {'v': version},
     ).toString();
   }
 
@@ -495,9 +538,9 @@ class _MetaChip extends StatelessWidget {
       child: Text(
         '$label: $value',
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -727,10 +770,7 @@ class _ComparePanel extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: SelectableText(
-                    url,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  child: SelectableText(url, style: theme.textTheme.bodySmall),
                 ),
                 const SizedBox(width: 8),
                 Tooltip(
@@ -764,8 +804,8 @@ class _ComparePanel extends StatelessWidget {
 
   void _copyUrl(BuildContext context) {
     Clipboard.setData(ClipboardData(text: url));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('URL copiada')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('URL copiada')));
   }
 }

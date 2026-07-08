@@ -1,17 +1,25 @@
 # morphix_ds_catalog
 
-A new Flutter project.
+Catalogo web do Morphix para preview de componentes, compare de PR e consulta
+de referencias Figma.
 
-## Getting Started
+## Rodar local
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run -d chrome
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Rotas uteis
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- Componente: `/?component=<component-id>`
+- Compare: `/?compare=1&component=<id>&base=<branch>&head=<branch>`
+- Figma: `/?figma=<figma-id>`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+ID Figma inicial disponivel:
+
+- `figma_picto_portfolio`
+
+Fonte canonica de paginas Figma:
+
+- `lib/src/figma_pages_registry.dart`

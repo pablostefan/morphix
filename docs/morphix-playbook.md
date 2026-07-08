@@ -110,6 +110,25 @@ No stub (nao web), renderiza fallback:
 - Head direta:
   `https://<owner>.github.io/<repo>/<head-slug>/<component-id>?v=<sha-head-12>`
 
+### 4.3 Figma Webview
+
+Para abrir referencia Figma dentro do catalogo:
+
+- `https://<owner>.github.io/<repo>/<branch-slug>/?figma=<figma-id>`
+
+Exemplo de id inicial:
+
+- `figma_picto_portfolio`
+
+Fonte canonica do mapa Figma:
+
+- `morphix_ds_catalog/lib/src/figma_pages_registry.dart`
+
+Observacao:
+
+1. O embed depende de permissoes/politicas externas do Figma.
+2. Se o iframe nao renderizar, usar acao `Abrir no Figma`.
+
 ## 5. Workflow DS Preview (CI/CD)
 
 Arquivo:
@@ -434,6 +453,7 @@ gh api repos/<owner>/<repo>/pages
 2. Adicionar validacao automatica para detectar ausencia de `main/` em `gh-pages`.
 3. Publicar changelog de componentes no comentario da PR.
 4. Criar script de bootstrap para reproduzir o setup em novos monorepos.
+5. Evoluir Figma Webview para configuracao dinamica por ambiente, se necessario.
 
 ## 16. Operacao no Azure Pipelines (hibrido)
 

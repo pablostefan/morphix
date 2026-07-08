@@ -29,6 +29,24 @@ Exemplo atual:
 
 - `main/ds_button`
 
+## Figma Webview (teste)
+
+O catalogo suporta abrir referencias de Figma via query param:
+
+- `https://<owner>.github.io/morphix/<branch-slug>/?figma=<figma-id>`
+
+Entrada inicial configurada:
+
+- `figma_picto_portfolio`
+
+No ambiente local, exemplo:
+
+- `http://localhost:PORT/?figma=figma_picto_portfolio`
+
+Fonte canonica dos links Figma:
+
+- `morphix_ds_catalog/lib/src/figma_pages_registry.dart`
+
 ## Adicionar novo componente
 
 1. Crie um arquivo preview em `morphix_ds_catalog/lib/src/components/`, por exemplo `morphix_ds_catalog/lib/src/components/ds_button_preview.dart`.
