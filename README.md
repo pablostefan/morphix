@@ -1,5 +1,12 @@
 # Morphix
 
+## Exemplo no SOMA
+
+A imagem mostra a versão do Morphix utilizada no SOMA, Design System da XP Inc., com comparação visual e informações de acessibilidade. Essa versão evoluiu em equipe e possui recursos adicionais em relação à POC pública deste repositório.
+
+<img width="2048" height="1163" alt="1788931789495" src="https://github.com/user-attachments/assets/c570dca8-4b8c-41e9-8601-7174318476bc" />
+
+
 Monorepo com:
 
 - `morphix_design_system`: package de componentes DS.
